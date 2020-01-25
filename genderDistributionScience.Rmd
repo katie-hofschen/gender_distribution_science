@@ -1,0 +1,831 @@
+---
+title: "genderDistributionScience"
+author: "Katharina Hofschen"
+date: "1/22/2020"
+output: html_notebook
+---
+
+## Data Exploration and Visualization project: 
+
+### Goal of project: Explore data about people in various stages of education and work in the field of Science and Engineering
+I found a data challenge on data.world for [Women's History Month](https://data.world/womens-history-month/womens-history-month-week-2) that asked to analyse the distribution of women in Science and Engineering fields across undergraduate, graduate degrees, post doc positions and employment.
+I followed the data to it's source: [NCSES](https://ncses.nsf.gov/pubs/nsf19304/data), which are basically a lot of excel files of the data.
+After reading the [technical notes](https://ncses.nsf.gov/pubs/nsf19304/technical-notes) I decided the data seemed reliable enough to check out further as it was an aggregate out of census' and government surveys.
+
+### Import libraries
+The libraries tidyverse and dplyr are the basic libraries for most of the functions used in this project. The waffle library  I originally added devtools to get a newer version of the waffle library because it's supposed to have better functionality.
+
+```{r}
+library("tidyverse")
+library("readxl")
+library("waffle")
+#library(treemapify)
+# TODO check out yaml parser
+```
+
+After updating to a newer version of R I luckily could skip this step to make the waffle library work. \
+install.packages("https://cran.r-project.org/src/contrib/Archive/rlang/rlang_0.4.1.tar.gz", repo=NULL, type="source") \
+devtools::install_github("hrbrmstr/waffle") \
+packageVersion("waffle") \
+
+
+I originally checked if the read excel function can save me some preprocesssing work. However, I had to work on the excel sheets to tidy them up a little anyway so I just directly exported them as .csv.
+```{r}
+
+#read_delim works better
+test_excel <- read_excel("originall_ScienceEngDistr/BachelorAwarded1997_2016.xlsx", sheet = "Table 5-13", range = cell_rows(5:25))
+head(test_excel)
+```
+
+## Preprocessing of the Excel sheets:
+The data collected was pretty messy, for example, using indentation to represent levels of hierarchy across various different variables. It also contains a lot of summarizations of other values in rows and sometimes variables like sex and ethnicity were collected separately and you can't infer how many of an ethnicity are female or male.
+
+The following are the manual preprossessing steps I did on the excel sheets:
+1. I removed overarching columns that group underlying columns together and renamed the columns under an overarching column if they are not clear by themselves \
+2. I split up columns that contain more than one variable: generally field/occupation, sex and ethnicity (these were generally the ones encoded in indents for the hierarchy so I did it manually and not with separate or spread) \
+3. Columns that hold several variables use indentation to show the different levels of a tree structure with some rows like Not-hispanic or Science etc. as summaries of the lower levels.\
+4. I removed all summaries of the lower levels of hierarchy and created an extra column to keep track of their parent nodes like overfield/classification for the cases of occupation and field so I would be able to show different levels of granularity. \
+5. I renamed most of the columns to start with a small letter, be fairly short and connect several words through an underscore.
+6. I added a column that \
+
+Some notes on the data for better understanding:
+* ethnicities, race are only recorded for citizens or permanent residents. \
+* for easier use in the functions I shortened some of the ethnicities (eg. more_Races actually represents the category more than one race) \
+* hispanic or Latino can be any race \
+* some of the categories in race were added or removed over the years which for example is why Asian and Pacific Islander become 2 individual groups after 2010 and other examples. \
+* I included the original excel files and all their notes in this project so I could always cross reference the excel files I created to the original ones. \
+
+I furthermore preprocessed the data here to create a variable for the ethnicity and a variable for the number of undergraduate enrollments from 2002 to 2016.
+```{r UndergradEnrollment02_16}
+#every 2 years
+UndergradEnrollment02_16 <- read_delim("CSVs/UndergradEnrollment02_16.csv", delim = ";", na="NA")
+
+male_femaleUndergrad <- UndergradEnrollment02_16 %>% 
+  select(year, female, male, enrollment_type) %>% 
+  gather(key = "sex", value = "enrolledUndergrad", female:male)
+
+ethnicityUndergrad <- UndergradEnrollment02_16 %>% 
+  select(year, enrollment_type, white:temporary_resident) %>% 
+  gather(key = "ethnicity_race_citiz", value = "undergradEnroll", white:temporary_resident)
+
+head(UndergradEnrollment02_16)
+head(male_femaleUndergrad)
+head(ethnicityUndergrad)
+```
+
+
+```{r UndergraduateEnrollment2016_1}
+UndergraduateEnrollment2016 <- read_delim("CSVs/UndergraduateEnrollment2016.csv", delim = ";") %>% 
+  gather(key = "ethnicity_race_citiz", value = "undergradEnroll", white:temporary_resident)
+head(UndergraduateEnrollment2016)
+```
+
+Bachelor's degrees awarded in engineering, by sex, race, ethnicity, and citizenship: 1997–2016
+The values for sex are summaries and aren't related to the race/ethnicity/citizenship. Therefore I have split them up into individual tables.
+
+```{r bachelors1997_2016}
+bachelors1997_2016 <- read_delim("CSVs/Bachelors1997_2016.csv", delim = ";", na=c("na","NA")) 
+
+male_female <- bachelors1997_2016 %>% 
+  select(year, female, male) %>% 
+  gather(key = "sex", value = "awardedBachelors", female:male)
+
+
+# In this data frame I aggregated the categories that were only one category before 2010 for comparability in the plot
+ethnicity_by_Year_AGG <- bachelors1997_2016 %>% 
+  select(year, white:temporary_resident) %>% 
+  gather(key = "ethnicity", value = "awardedBachelors", white:temporary_resident)
+
+#This is the data in its original form with 1 category until 2010 and several different categories starting 2011
+ethnicity_by_Year <- bachelors1997_2016 %>% 
+  select(year, white:native_Hawaiian_or_Other_Pacific_Islander) %>% 
+  gather(key = "ethnicity", value = "awardedBachelors", white:native_Hawaiian_or_Other_Pacific_Islander) %>% 
+  subset(ethnicity != "asian_or_Pacific_Islander_AGG")
+
+head(male_female)
+head(ethnicity_by_Year_AGG)
+head(ethnicity_by_Year)
+```
+
+```{r bachelor_2006-16}
+bachelor_awarded6_16 <- read_delim("CSVs/BachelorAwarded2006_16_clean.csv", delim = ";", na="na") %>%
+  gather(key= "year", value = "bachelorAwarded",`2006`:`2016` ) %>% 
+  mutate(bachelorAwarded = as.numeric(str_replace_all(bachelorAwarded, "\\.",""))) %>% 
+  mutate(year = as.numeric(year))
+head(bachelor_awarded6_16)
+```
+
+```{r graduateStudents2016}
+options(scipen=999)
+graduateStudents2016 <- read_delim("CSVs/graduateStudents2016.csv", delim = ";") %>% 
+  gather(key = "ethnicity_race_citiz", value = "gradStudents", hispanic_Latino:temporary_visa)
+head(graduateStudents2016)
+```
+
+
+
+```{r doctoralDegrees2006_16}
+doctoralDegrees2006_16 <- read_delim("CSVs/DoctoralDegrees2006_16.csv", delim = ";", na="na") %>% 
+  gather(key= "year", value = "doctoralDegrees",`2006`:`2016` ) %>% 
+  mutate(year = as.numeric(year))
+
+head(doctoralDegrees2006_16)
+```
+
+```{r postdoc2016}
+postdoc2016 <- read_delim("CSVs/postdoc2016.csv", delim = ";", na=c("S", "D", "*")) %>% 
+  gather(key = temp, value = postdoc, citizens_Female:Temporary_Male) %>% 
+  separate(temp, into = c("resident_status", "sex"))
+
+head(postdoc2016)
+```
+
+```{r associateDegree2016}
+associateDegree2016 <- read_delim("CSVs/associateDegree2016.csv", delim = ";") %>% 
+  gather(key="field", value = "awardedAssociateDeg", agricultural_sciences:other_SE_tech) %>% 
+  mutate(sex=as.factor(sex)) %>% 
+  mutate(ethnicity = as.factor(ethnicity)) %>% 
+  mutate(field = as.factor(field))
+
+glimpse(associateDegree2016)
+head(associateDegree2016)
+range(associateDegree2016$awardedAssociateDeg)
+
+head(associateDegree2016)
+```
+
+The numbers in the original dataset don't add up completely, Hispanic, Black and white don't add up to total occupied, which according to the source is because the data was rounded to thousands. 1 in the original data represents 1000 in reality.
+```{r employed16plus2008_17}
+employed16plus2008_17 <- read_delim("CSVs/Employed16plus2008_17.csv", delim = ";", na=c("na")) %>% 
+  gather(key = "year", value = "employed", `2008`:`2017`)
+head(employed16plus2008_17)
+```
+
+
+```{r employedScientists2017}
+employedScientists2017 <- read_delim("CSVs/EmployedScientists_2017.csv", delim = ";", na="NA") %>% 
+  gather(key = degree_type, value = degree, bachelor_Female:doctorate_Male) %>% 
+  separate(degree_type, into = c("degree_type", "sex"))
+head(employedScientists2017)
+```
+
+
+```{r Employed_Women16plus}
+Employed_Women16plus <- read_delim("CSVs/EmployedWomen16plus2008_17.csv", delim = ";", na=c("na")) %>% 
+  gather(key= "year", value = "employ_women",`2008`:`2017` ) %>% 
+  mutate(year = as.numeric(year))
+head(Employed_Women16plus)
+```
+
+
+```{r EmployedMen16plus2008_17}
+EmployedMen16plus2008_17 <- read_delim("CSVs/EmployedMen16plus2008_17.csv", delim = ";", na=c("S", "D", "*")) %>% 
+  gather(key= "year", value = "employedMen",`2008`:`2017` ) %>% 
+  mutate(year = as.numeric(year))
+
+head(EmployedMen16plus2008_17)
+```
+
+```{r Employed_Men_Women2008_17}
+employedMen_Women2008_17 <- inner_join(Employed_Women16plus, EmployedMen16plus2008_17, c("occupation", "year")) %>% 
+  rename(female = employ_women,
+         male = employedMen) %>% 
+  gather(key = "sex", value= "employed", female:male)
+head(employedMen_Women2008_17)
+```
+
+## Data visualisations:
+## Visualisations for Associate Degrees
+These are the first visualisations I played around with but I decided against them because they aren't so easily readable.
+```{r associateDegree2016_VIS}
+ethnic_to_field <- associateDegree2016 %>% 
+  group_by(ethnicity,field) %>% 
+  summarise(avg_awDeg = mean(awardedAssociateDeg, na.rm = TRUE))
+
+sex_to_field <- associateDegree2016 %>% 
+  group_by(field,sex) %>% 
+  summarise(avg_awDeg = mean(awardedAssociateDeg, na.rm = TRUE))
+
+ethnic_to_field
+sex_to_field
+
+
+associateDegree2016 %>% 
+  ggplot(mapping = aes(x = field, y= ethnicity, size = awardedAssociateDeg, color = sex)) +
+  geom_point() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  facet_wrap(~sex)
+
+#The following three plots all have the problem that they are too colorful to mean anything
+
+associateDegree2016 %>% 
+  ggplot(mapping = aes(x = field, y = awardedAssociateDeg, color = ethnicity)) +
+  geom_point() +
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+
+```{r associateDegree2016_VIS2}
+# too many colors -> confusing
+associateDegree2016 %>% 
+  ggplot(mapping = aes(x = sex, y = awardedAssociateDeg, fill = field)) + 
+  geom_bar(stat = "identity") +
+  ggtitle("Good luck finding the leprechaun's pot of gold")
+
+#A graph based on the Excel file's structure of grouping
+associateDegree2016 %>% 
+  mutate(field = fct_recode(field, Science = "agricultural_sciences", Science = "biological_sciences", Science = "computer_sciences", Science = "earth_ocean_sciences", Science = "physical_sciences", Science =  "social_sciences", Science = "psychology", Science = "mathematics_statistics", SE_tech = "engineering_SE_tech", SE_tech = "other_SE_tech",SE_tech = "health_SE_tech")) %>% 
+  mutate(field = fct_relevel(field, c("SE_tech","engineering", "Science"))) %>% 
+  ggplot(mapping = aes(x = sex, y = awardedAssociateDeg, fill = field)) + 
+  geom_bar(stat = "identity") + 
+  ggtitle("Associate degrees given by field of study in 2016") +
+  scale_fill_discrete(name="Field of study",
+                       labels=c("Science & Engineering technologies", "Engineering", "Science")) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(x = "Sex", y = "Awarded Associate's") +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))
+
+#graph to show temporary resident vs citizen or permanent resident
+associateDegree2016 %>% 
+  mutate(citizen_temp = fct_recode(ethnicity, CitizenResident = "asian",  CitizenResident = "native_Hawaiian_Pacific_Islander", CitizenResident = "black_African_American", CitizenResident = "more_races",  CitizenResident = "native_American" ,  CitizenResident ="Other_unknown", CitizenResident = "white", CitizenResident = "hispanic_Latino")) %>%
+  ggplot(mapping = aes(x = sex, y = awardedAssociateDeg, fill = citizen_temp)) + 
+  geom_bar(stat = "identity") +
+  ggtitle("Associate degrees given to citizens vs temporary residents in 2016") +
+  scale_fill_discrete(name="Citizen or temporary resident",
+                       labels=c("Citizen or permanent resident", "Temporary resident")) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(x = "Sex", y = "Awarded Associate's") +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))
+
+#Focus in on Computer Science out of curiousity
+associateDegree2016 %>% 
+  mutate(field = fct_recode(field, ScienceEngin = "agricultural_sciences", ScienceEngin = "biological_sciences", ScienceEngin = "earth_ocean_sciences", ScienceEngin = "physical_sciences", ScienceEngin =  "social_sciences", ScienceEngin = "psychology", ScienceEngin = "mathematics_statistics", ScienceEngin = "engineering_SE_tech", ScienceEngin = "other_SE_tech",ScienceEngin = "health_SE_tech", ScienceEngin = "engineering")) %>% 
+  ggplot(mapping = aes(x = sex, y = awardedAssociateDeg, fill = field)) + 
+  geom_bar(stat = "identity") + 
+  ggtitle("Associate degrees in Computer Science by sex in 2016") +
+  scale_fill_discrete(name="Computer Science vs Other",
+                       labels=c("Science and Engineering", "Computer Science")) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(x = "Sex", y = "Awarded Associate's") +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))
+```
+
+### Undergraduate Enrollment from 2002 to 2016
+```{r UndergradEnrollment02_16_VIS}
+# you can't combine sex and ethnicity because they are separately measured, we don't know the parts of ethnicities that are female or male
+male_femaleUndergrad 
+
+#bachelor enrollment by sex
+male_femaleUndergrad %>% 
+  subset(enrollment_type == "all_enrolled") %>% 
+  drop_na() %>% 
+  ggplot(mapping = aes(x=year, y=enrolledUndergrad, fill = sex)) + 
+  geom_bar(stat= "identity") +
+  facet_wrap(~sex) +
+  ggtitle("Bachelor Enrollment by Sex from 2002 to 2016") +
+  labs(x= "Year",y = "Bachelor Enrollment") +
+  scale_fill_discrete(name="Resident Status", labels= c("Citizens or \nPermanent Residents", "Temporary Residents")) +
+  scale_x_continuous(breaks = c(2002,2004,2006,2008,2010,2012,2014,2016)) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray")) +
+  theme(legend.position = "none")
+
+#bachelor enrollment by ethnicity  
+ethnicityUndergrad %>% 
+  subset(enrollment_type == "all_enrolled") %>% 
+  filter(ethnicity_race_citiz != "temporary_resident") %>% 
+  drop_na() %>% 
+  mutate(ethnicity_race_citiz = fct_recode(ethnicity_race_citiz,asian_Pacific_Islander= "asian", native_American = "native_Hawaiian" )) %>% 
+  mutate(ethnicity_race_citiz = fct_relevel(ethnicity_race_citiz, c("white","more_races","black_African_American", "asian_Pacific_Islander", "hispanic_Latino","native_American"))) %>% 
+  ggplot(mapping = aes(x=year, y=undergradEnroll, fill = ethnicity_race_citiz)) + 
+  geom_bar(stat= "identity") +
+  scale_x_continuous(breaks = c(2002,2004,2006,2008,2010,2012,2014,2016)) +  
+  ggtitle("Bachelor Enrollment by Ethnicity from 2002 to 2016") +
+  labs(x= "Year",y = "Bachelor Enrollment") +
+  scale_fill_discrete(name="Ethnicity or Race", labels= c("White", "More than one race", "Black or African American", "Asian or Pacific Islander", "Hispanic or Latinx", "Native American or Hawaiian")) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))
+```
+
+## Bachelor's awarded from 1997 to 2016
+```{r bachelors1997_2016_gender}
+male_female %>% 
+  drop_na() %>% 
+  ggplot(mapping = aes(x = year, y = awardedBachelors, color = sex)) +
+  geom_line(size = 1) +
+  scale_x_continuous(breaks = c(1997,1999,2001,2003,2005,2007,2009,2011,2013,2015)) +
+  labs(title = "Bachelor degrees awarded from 1997 to 2016 by gender", x = "Year", y = "Awarded Bachelor's") +
+  scale_x_continuous(breaks = c(1997,1999,2001,2003,2005,2007,2009,2011,2013,2015)) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))
+```
+```{r bachelor1997_2016_VIS}
+
+ethnicity_by_Year_AGG %>% 
+  #mutate(ethnicity = fct_recode(ethnicity, other_or_unknown = "more_races")) %>% 
+  mutate(ethnicity = fct_relevel(ethnicity, c("white", "asian_or_Pacific_Islander_AGG", "hispanic_or_Latino", "temporary_resident",  "black_or_African_American", "more_races","other_or_unknown","native_American" ))) %>% 
+  drop_na() %>% 
+  ggplot(mapping = aes(x = year, y = awardedBachelors, color= ethnicity)) +
+  geom_line(size= 1) +
+  scale_x_continuous(breaks = c(1997,1999,2001,2003,2005,2007,2009,2011,2013,2015)) +
+  ggtitle("Bachelor degrees awarded by ethnicity and race: 1997 to 2016") +
+  labs(x = "Year", y = "Awarded Bachelor's") +
+  scale_color_discrete(name="Ethnicities and races",
+                      labels=c("White","Asian or Pacific Islander", "Hispanic or Latinx", "Temporary resident" ,"Black or African American", "More than one race", "Other or unknown", "Native American or Alaskan")) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))
+
+```
+
+```{r bachelors1997_2016_ethnicity}
+#To be ordered by appearance as in graph above
+ethnicity_by_Year_AGG %>% 
+  subset(ethnicity != c("temporary_resident")) %>% 
+  drop_na() %>% 
+  ggplot(mapping = aes(x = year, y = awardedBachelors, color= ethnicity)) +
+  geom_line(size= 1) +
+  scale_x_continuous(breaks = c(1997,1999,2001,2003,2005,2007,2009,2011,2013,2015)) +
+  ggtitle("Bachelor degrees by citizens / permanent residents: 1997 to 2016") +
+  labs(x = "Year", y = "Awarded Bachelor's") +
+  scale_color_discrete(name="Ethnicities and races",
+                      labels=c("Asian or Pacific Islander", "Black or African American", "Hispanic or Latinx", "More than one race", "Native American or Alaskan", "Other or unknown", "White")) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))
+
+
+  
+ethnicity_by_Year_AGG %>% 
+  subset(ethnicity != c("white")) %>% 
+  subset(ethnicity != c("temporary_resident")) %>% 
+  drop_na() %>% 
+  ggplot(mapping = aes(x = year, y = awardedBachelors, color= ethnicity)) +
+  geom_line(size= 1) + 
+  scale_x_continuous(breaks = c(1997,1999,2001,2003,2005,2007,2009,2011,2013,2015)) +
+  ggtitle("Bachelor degrees by non-white citizens / permanent residents: 1997 to 2016") +
+  labs(x = "Year", y = "Awarded Bachelor's") +
+  scale_color_discrete(name="Ethnicities and races",
+                      labels=c("Asian or Pacific Islander", "Black or African American", "Hispanic or Latinx", "More than one race", "Native American or Alaskan", "Other or unknown")) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))
+
+
+ethnicity_by_Year_AGG %>% 
+  subset(ethnicity == c("native_American")) %>% 
+  drop_na() %>% 
+  ggplot(mapping = aes(x = year, y = awardedBachelors)) +
+  geom_line(size=1, color = "#619CFF") +
+  scale_x_continuous(breaks = c(1997,1999,2001,2003,2005,2007,2009,2011,2013,2015)) +
+  ggtitle("Bachelor degrees by Native Americans or Alaskans: 1997 to 2016") +
+  labs(x = "Year", y = "Awarded Bachelor's") +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))
+
+
+
+ethnicity_by_Year_AGG %>% 
+  subset(ethnicity == c("black_or_African_American")) %>% 
+  drop_na() %>% 
+  ggplot(mapping = aes(x = year, y = awardedBachelors)) +
+  geom_line(size=1, color= "goldenrod") +
+  scale_x_continuous(breaks = c(1997,1999,2001,2003,2005,2007,2009,2011,2013,2015)) +  
+  ggtitle("Bachelor degrees by Blacks or African Americans: 1997 to 2016") +
+  labs(x = "Year", y = "Awarded Bachelor's") +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))
+
+
+ethnicity_by_Year_AGG %>% 
+  subset(ethnicity == c("hispanic_or_Latino")) %>% 
+  drop_na() %>% 
+  ggplot(mapping = aes(x = year, y = awardedBachelors)) +
+  geom_line(size=1, color= "#00BA38") +
+  scale_x_continuous(breaks = c(1997,1999,2001,2003,2005,2007,2009,2011,2013,2015)) +  
+  ggtitle("Bachelor degrees by Hispanics or Latinx: 1997 to 2016") +
+  labs(x = "Year", y = "Awarded Bachelor's") +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))
+
+```
+
+
+I originally thought of making a gif out of the waffle over time, however as the overall number of students increases the size of the chart changes and I'd need more time to figure that out and lign it up correctly.
+```{r waffle_bachelor}
+waffle_FM <- bachelors1997_2016 %>% 
+  select(year, female, male)
+
+year1997 <- waffle_FM[1,2:3]  %/% 100
+year1998 <- waffle_FM[2,2:3]  %/% 100
+#skipping 1999 because it's all NA
+year2000 <- waffle_FM[4,2:3]  %/% 100
+year2001 <- waffle_FM[5,2:3]  %/% 100
+year2002 <- waffle_FM[6,2:3]  %/% 100
+year2003 <- waffle_FM[7,2:3]  %/% 100
+year2004 <- waffle_FM[8,2:3]  %/% 100
+year2005 <- waffle_FM[9,2:3]  %/% 100
+year2006 <- waffle_FM[10,2:3]  %/% 100
+year2007 <- waffle_FM[11,2:3]  %/% 100
+year2008 <- waffle_FM[12,2:3]  %/% 100
+year2009 <- waffle_FM[13,2:3]  %/% 100
+year2010 <- waffle_FM[14,2:3]  %/% 100
+year2011 <- waffle_FM[15,2:3]  %/% 100
+year2012 <- waffle_FM[16,2:3]  %/% 100
+year2013 <- waffle_FM[17,2:3]  %/% 100
+year2014 <- waffle_FM[18,2:3]  %/% 100
+year2015 <- waffle_FM[19,2:3]  %/% 100
+year2016 <- waffle_FM[20,2:3]  %/% 100
+
+
+waffle(year1997,rows = 25, equal = TRUE,title = "Bachelor degrees by gender: 1997", xlab = "1 Box represents 100 students", colors= c("#DAA520","#191970","white"))
+waffle(year1998,rows = 25, equal = TRUE,title = "Bachelor degrees by gender: 1998", xlab = "1 Box represents 100 students", colors= c("#DAA520","#191970","white"))
+waffle(year2000,rows = 25, equal = TRUE,title = "Bachelor degrees by gender: 2000", xlab = "1 Box represents 100 students", colors= c("#DAA520","#191970","white"))
+waffle(year2001,rows = 25, equal = TRUE,title = "Bachelor degrees by gender: 2001", xlab = "1 Box represents 100 students", colors= c("#DAA520","#191970","white"))
+waffle(year2002,rows = 25, equal = TRUE,title = "Bachelor degrees by gender: 2002", xlab = "1 Box represents 100 students", colors= c("#DAA520","#191970","white"))
+waffle(year2003,rows = 25, equal = TRUE,title = "Bachelor degrees by gender: 2003", xlab = "1 Box represents 100 students", colors= c("#DAA520","#191970","white"))
+waffle(year2004,rows = 25, equal = TRUE,title = "Bachelor degrees by gender: 2004", xlab = "1 Box represents 100 students", colors= c("#DAA520","#191970","white"))
+waffle(year2005,rows = 25, equal = TRUE,title = "Bachelor degrees by gender: 2005", xlab = "1 Box represents 100 students", colors= c("#DAA520","#191970","white"))
+waffle(year2006,rows = 25, equal = TRUE,title = "Bachelor degrees by gender: 2006", xlab = "1 Box represents 100 students", colors= c("#DAA520","#191970","white"))
+waffle(year2007,rows = 25, equal = TRUE,title = "Bachelor degrees by gender: 2007", xlab = "1 Box represents 100 students", colors= c("#DAA520","#191970","white"))
+waffle(year2008,rows = 25, equal = TRUE,title = "Bachelor degrees by gender: 2008", xlab = "1 Box represents 100 students", colors= c("#DAA520","#191970","white"))
+waffle(year2009,rows = 25, equal = TRUE,title = "Bachelor degrees by gender: 2009", xlab = "1 Box represents 100 students", colors= c("#DAA520","#191970","white"))
+waffle(year2010,rows = 25, equal = TRUE,title = "Bachelor degrees by gender: 2010", xlab = "1 Box represents 100 students", colors= c("#DAA520","#191970","white"))
+waffle(year2011,rows = 25, equal = TRUE,title = "Bachelor degrees by gender: 2011", xlab = "1 Box represents 100 students", colors= c("#DAA520","#191970","white"))
+waffle(year2012,rows = 25, equal = TRUE,title = "Bachelor degrees by gender: 2012", xlab = "1 Box represents 100 students", colors= c("#DAA520","#191970","white"))
+waffle(year2013,rows = 25, equal = TRUE,title = "Bachelor degrees by gender: 2013", xlab = "1 Box represents 100 students", colors= c("#DAA520","#191970","white"))
+waffle(year2014,rows = 25, equal = TRUE,title = "Bachelor degrees by gender: 2014", xlab = "1 Box represents 100 students", colors= c("#DAA520","#191970","white"))
+waffle(year2015,rows = 25, equal = TRUE,title = "Bachelor degrees by gender: 2015", xlab = "1 Box represents 100 students", colors= c("#DAA520","#191970","white"))
+waffle(year2016,rows = 25, equal = TRUE,title = "Bachelor degrees by gender: 2016", xlab = "1 Box represents 100 students", colors= c("#DAA520","#191970","white"))
+```
+
+
+## Bachelor's degrees awarded, by field, citizenship, ethnicity, and race: 2006–16
+
+fields :
+"Agricultural sciences"                       "Biological sciences"                         "Computer sciences"                          
+"Atmospheric sciences"                        "Earth sciences"                              "Ocean sciences"                             
+"Mathematics and statistics"                  "Astronomy"                                   "Chemistry"                                  
+"Physics"                                     "Physical sciences Other"                     "Psychology"                                 
+"Anthropology"                                "Area and ethnic studies"                     "Economics"                                  
+"History of science"                          "Linguistics"                                 "Political science and public administration"
+"Sociology"                                   "Social_siences_Other"                        "Chemical engineering"                       
+"Civil engineering"                           "Electrical engineering"                      "Industrial engineering"                     
+"Mechanical engineering"                      "Engineering-Other"                          "Non S&E"    
+
+```{r bachelor_2006-16_categories}
+unique(bachelor_awarded6_16$field)
+
+bachelor_awarded6_16 %>% 
+  drop_na() %>% 
+  mutate(field = fct_recode(field, Science = "Agricultural sciences", Science = "Biological sciences", Science = "Computer sciences", Science =  "Atmospheric sciences", Science = "Earth sciences", Science = "Ocean sciences", Science = "Astronomy", Science = "Chemistry", Science =  "Physics", Science = "Physical sciences Other", Science =  "Anthropology", Science =  "Area and ethnic studies", Science = "Economics", Science =  "History of science", Science =  "Linguistics", Science =  "Political science and public administration", Science = "Sociology", Science = "Social_siences_Other", Science = "Mathematics and statistics", Science = "Psychology", Engineering ="Chemical engineering" , Engineering = "Civil engineering", Engineering ="Electrical engineering", Engineering ="Industrial engineering" , Engineering ="Mechanical engineering", Engineering ="Engineering-Other")) %>% 
+  ggplot(mapping = aes(x = year, y = bachelorAwarded, fill = field)) +
+  geom_bar(stat = "identity") + 
+  scale_x_continuous(breaks = c(2006,2008,2010,2012,2014,2016)) +
+  ggtitle("Bachelors awarded by category of study field from 2006 to 2016") +
+  labs(x = "Year", y = "Awarded Bachelor's") +
+  scale_fill_discrete(name="Categories of fields") +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray")) +
+  scale_y_continuous(labels = scales::comma)
+```
+```{r bachelor_2006-16_Science}
+#All fields that fall under the category Science
+bachelor_awarded6_16 %>% 
+  subset(classification_of_field  != "Engineering") %>% 
+  subset(classification_of_field  != "All fields") %>% 
+  mutate(field = fct_recode(field,  socialSciences = "Anthropology", socialSciences = "Area and ethnic studies",socialSciences = "Economics",socialSciences = "History of science",socialSciences = "Linguistics",socialSciences = "Political science and public administration",socialSciences ="Sociology",socialSciences ="Social_siences_Other", math_CS = "Computer sciences", math_CS = "Mathematics and statistics", Other = "Astronomy", Other = "Chemistry", Other = "Physics", Other = "Physical sciences Other", Other = "Atmospheric sciences", Other = "Earth sciences", Other = "Ocean sciences",)) %>% 
+  mutate(field = fct_relevel(field, c( "Agricultural sciences", "Biological sciences", "math_CS","socialSciences", "Psychology", "Other"))) %>% 
+  drop_na() %>% 
+  ggplot(mapping = aes(x = year, y = bachelorAwarded, fill = field)) + 
+  geom_bar(stat = "identity") + 
+  scale_x_continuous(breaks = c(2006,2008,2010,2012,2014,2016)) +
+  ggtitle("Bachelors awarded in Science from 2006 to 2016") +
+  labs(x = "Year", y = "Awarded Bachelor's") +
+  scale_fill_discrete(name="Science fields", labels=c("Agricultural sciences",  "Biological Sciences", "Mathematics and Computer sciences","Social sciences", "Psychology","Other sciences")) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray")) +
+  scale_y_continuous(labels = scales::comma)
+
+bachelor_awarded6_16 %>% 
+  subset(classification_of_field  != "Engineering") %>% 
+  subset(classification_of_field  != "All fields") %>% 
+  subset(year %in% c(2006,2016)) %>% 
+  mutate(field = fct_recode(field,  socialSciences = "Anthropology", socialSciences = "Area and ethnic studies",socialSciences = "Economics",socialSciences = "History of science",socialSciences = "Linguistics",socialSciences = "Political science and public administration",socialSciences ="Sociology",socialSciences ="Social_siences_Other", math_CS = "Computer sciences", math_CS = "Mathematics and statistics", Other = "Astronomy", Other = "Chemistry", Other = "Physics", Other = "Physical sciences Other", Other = "Atmospheric sciences", Other = "Earth sciences", Other = "Ocean sciences",)) %>% 
+  mutate(field = fct_relevel(field, c("Other", "Agricultural sciences","math_CS","socialSciences", "Biological sciences", "Psychology"))) %>% 
+  drop_na() %>% 
+  ggplot(mapping = aes(x = year, y = bachelorAwarded, fill = field)) + 
+  geom_bar(stat = "identity", position = "dodge") + 
+  scale_x_continuous(breaks = c(2006,2016)) +
+  ggtitle("Bachelors awarded in Science: 2006 vs 2016") +
+  labs(x = "Year", y = "Awarded Bachelor's") +
+  scale_fill_discrete(name="Science fields", labels=c("Agricultural sciences",  "Biological Sciences", "Mathematics and Computer sciences","Social sciences", "Psychology","Other sciences")) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray")) +
+  scale_y_continuous(labels = scales::comma)
+```
+For the bachelor's awarded I prefer the dodged position because it makes the information more comparable.
+
+```{r bachelor_2006-16_Engineering}
+#all fields of study that fall under the category Engineering
+bachelor_awarded6_16 %>% 
+  subset(classification_of_field  == "Engineering") %>% 
+  drop_na() %>% 
+  mutate(field = fct_relevel(field, c( "Industrial engineering", "Chemical engineering", "Civil engineering","Engineering-Other", "Electrical engineering", "Mechanical engineering"))) %>% 
+  ggplot(mapping = aes(x = year, y = bachelorAwarded, fill = field)) + 
+  geom_bar(stat = "identity") + 
+  scale_x_continuous(breaks = c(2006,2008,2010,2012,2014,2016)) +
+  ggtitle("Bachelors awarded in Engineering from 2006 to 2016") +
+  labs(x = "Year", y = "Awarded Bachelor's") +
+  scale_fill_discrete(name="Engineering fields") +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))
+
+bachelor_awarded6_16 %>%
+  subset(year %in% c(2006,2016)) %>% 
+  subset(classification_of_field  == "Engineering") %>% 
+  drop_na() %>% 
+  mutate(field = fct_relevel(field, c( "Industrial engineering", "Chemical engineering", "Civil engineering","Engineering-Other", "Electrical engineering", "Mechanical engineering"))) %>% 
+  ggplot(mapping = aes(x = year, y = bachelorAwarded, fill = field)) + 
+  geom_bar(stat = "identity", position = "dodge") + 
+  scale_x_continuous(breaks = c(2006,2016)) +
+  ggtitle("Bachelors awarded in Engineering: 2006 vs 2016") +
+  labs(x = "Year", y = "Awarded Bachelor's") +
+  scale_fill_discrete(name="Engineering fields") +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))
+```
+
+## S&E graduate students, by field, sex, citizenship, ethnicity, and race: 2016
+```{r graduateStudents2016_VIS}
+#IDEA ADD white outline around fill areas to distinguish colors better
+
+graduateStudents2016 %>% 
+  drop_na() %>% 
+  subset(ethnicity_race_citiz != "temporary_visa") %>% 
+  mutate(ethnicity_race_citiz = fct_recode(ethnicity_race_citiz, Native = "native_American", Native = "native_Hawaiian_Pacific_Islander", More = "more_races", More = "other_unknown")) %>% 
+  mutate(overfield = fct_recode(overfield, Science = "Social_sciences", Science = "Psychology", Science = "Physical_sciences", Science = "Earth,_atmospheric,_and_ocean_sciences", Science = "Biological_sciences", Science = "Mathematics_and_statistics")) %>% 
+  ggplot(mapping = aes(x=overfield, y=gradStudents, fill = ethnicity_race_citiz)) + 
+  geom_bar(stat= "identity") +
+  coord_flip() +
+  facet_wrap(~sex,ncol = 1) +
+  ggtitle("Graduate students with Citizenship or Permanent Residency in 2017") +
+  labs(y = "graduate Students", x= "Study field") +
+  scale_fill_discrete(name="Ethnicity", labels= c("Asian", "Black or African American","Hispanic or Latino", "More than 1 race","Native","White" )) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray")) 
+
+graduateStudents2016 %>% 
+  drop_na() %>% 
+  mutate(ethnicity_race_citiz = fct_recode(ethnicity_race_citiz, citiRes = "native_American", citiRes = "native_Hawaiian_Pacific_Islander", citiRes = "more_races", citiRes = "other_unknown", citiRes = "white", citiRes = "hispanic_Latino", citiRes= "black_African_American", citiRes = "asian")) %>% 
+  mutate(overfield = fct_recode(overfield, Science = "Social_sciences", Science = "Psychology", Science = "Physical_sciences", Science = "Earth,_atmospheric,_and_ocean_sciences", Science = "Biological_sciences", Science = "Mathematics_and_statistics")) %>% 
+  ggplot(mapping = aes(x=overfield, y=gradStudents, fill = ethnicity_race_citiz)) + 
+  geom_bar(stat= "identity") +
+  coord_flip() +
+  facet_wrap(~sex,ncol = 1) +
+  ggtitle("Graduate students in 2017") +
+  labs(y = "graduate Students", x= "Study field") +
+  scale_fill_discrete(name="Resident status", labels= c("Citizen or \nPermanent Resident", "Temporary Resident")) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))   
+
+graduateStudents2016 %>% 
+  drop_na() %>% 
+  subset(field == "Computer_sciences") %>% 
+  mutate(ethnicity_race_citiz = fct_recode(ethnicity_race_citiz, Native = "native_American", Native = "native_Hawaiian_Pacific_Islander", More = "more_races", More = "other_unknown")) %>% 
+  ggplot(mapping = aes(x=sex, y=gradStudents, fill = ethnicity_race_citiz)) + 
+  geom_bar(stat= "identity") +
+  ggtitle("Computer Science graduate student in 2017") +
+  labs(x= "Sex",y = "graduate Students") +
+  scale_fill_discrete(name="Ethnicity", labels= c("Asian", "Black or African American","Hispanic or Latino", "More than 1 race","Native","White","Temporary Resident" )) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))
+```
+## Visualisations for Doctoral Degrees from 2006 to 2016
+```{r doctoralDegrees2006_16_VIS}
+doctoralDegrees2006_16 %>% 
+  drop_na() %>% 
+  mutate(classification_of_field = fct_recode(classification_of_field, Science = "Earth, atmospheric, and ocean sciences", Science = "Physical sciences",Science = "Social sciences", )) %>% 
+  mutate(classification_of_field = fct_relevel(classification_of_field, c("Non-S&E","Science","Engineering"))) %>% 
+  ggplot(mapping = aes(x = year, y= doctoralDegrees, fill= classification_of_field)) +
+  geom_bar(stat = "identity") +
+  scale_x_continuous(breaks = c(2006,2008,2010,2012,2014,2016)) +
+  scale_fill_discrete(name="Categories of fields", labels=c("Non-science & Engineering","Science", "Engineering")) +
+  labs(title = "Doctorate degrees from 2006 to 2016", x = "Year", y = "Awarded Doctoral degrees") +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))
+```
+
+
+## Visualisation for Postdoctorate positions
+
+```{r postdoc2016_VIS}
+postdoc2016 %>% 
+  drop_na() %>% 
+  ggplot(mapping = aes(x=sex, y=postdoc, fill = resident_status)) + 
+  geom_bar(stat= "identity") +
+  ggtitle("Postdoctorate positions 2016") +
+  labs(x= "Sex",y = "graduate Students") +
+  scale_fill_discrete(name="Resident Status", labels= c("Citizens or \nPermanent Residents", "Temporary Residents")) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))
+
+postdoc2016 %>% 
+  subset(fields == "Computer sciences") %>% 
+  drop_na() %>% 
+  ggplot(mapping = aes(x=sex, y=postdoc, fill = resident_status)) + 
+  geom_bar(stat= "identity") +
+  ggtitle("Postdoctorate positions in Computer Science 2016") +
+  labs(x= "Sex",y = "graduate Students") +
+  scale_fill_discrete(name="Resident Status", labels= c("Citizens or \nPermanent Residents", "Temporary Residents")) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))
+```
+
+
+
+## Visualisations for employed people with a focus on Science and engineering
+
+```{r employedScientists2017_VIS}
+employedScientists2017 %>% 
+  subset(sex = "male") %>% 
+  mutate(degree_type = fct_relevel(degree_type, c("doctorate","master","bachelor"))) %>% 
+  mutate(ethnicities = fct_relevel(ethnicities, c("white","asian","hispanic_Latino","black_African_American","more_races","native_american","native_Hawaiian_Pacific_Islander"))) %>% 
+  drop_na() %>% 
+  ggplot(mapping = aes(x=ethnicities, y=degree, fill = degree_type)) + 
+  geom_bar(stat= "identity") +
+  coord_flip() +
+  ggtitle("Male employed scientists in 2017") +
+  scale_fill_discrete(name="Type of degree", labels= c("Doctorate", "Master","Bachelor" )) +
+  scale_x_discrete(labels = c("White", "Asian", "Hispanic or Latinx", "Black or African American", "More than one race", "Native American", "Native Hawaiian or Pacific Islander")) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))
+  
+
+employedScientists2017 %>% 
+  subset(sex == "Female") %>% 
+  mutate(degree_type = fct_relevel(degree_type, c("doctorate","master","bachelor"))) %>% 
+  mutate(ethnicities = fct_relevel(ethnicities, c("white","asian","hispanic_Latino","black_African_American","more_races","native_american","native_Hawaiian_Pacific_Islander"))) %>% 
+  drop_na() %>% 
+  ggplot(mapping = aes(x=ethnicities, y=degree, fill = degree_type)) + 
+  geom_bar(stat= "identity") +
+  coord_flip() +
+  ggtitle("Female employed scientists in 2017") +
+  scale_fill_discrete(name="Type of degree", labels= c("Doctorate", "Master","Bachelor" )) +
+  scale_x_discrete(labels = c("White", "Asian", "Hispanic or Latinx", "Black or African American", "More than one race", "Native American", "Native Hawaiian or Pacific Islander")) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray"))
+```
+
+Idea for grouping:
+Science = "Biological or life scientist",
+Science = "Chemist",
+Science = "Dietitian",
+Science = "Psychologist",
+Science = "Other natural scientist",
+Science = "Other social scientist or urban planner",
+Science = "Mathematical or computer scientist",
+Science = "Pharmacist",
+
+Engineer = "Engineer",
+Engineer ="Health technologist or technician",
+Engineer ="Science technician",
+Engineer ="Engineering and related technologist or technician",
+
+Other = "Architect",
+Other = "Physician",
+Other = "Physicians' assistant",
+Other = "Registered nurse",
+Other = "Therapist",
+Other = "Teacher, postsecondary (college and university)",
+Other = "Teacher, except postsecondary (college and university)",
+Other = "Other health care professional",
+Other = "Lawyer or judge",
+Other = "Other professional or related occupation"
+```{r }
+unique(employed16plus2008_17$occupation_VIS)
+
+employed16plus2008_17 %>% 
+  ggplot(mapping = aes(x=year, y=employed, fill = ethnicity_race)) + 
+  geom_bar(stat="identity") +
+  #scale_x_continuous(breaks = c(1997,1999,2001,2003,2005,2007,2009,2011,2013,2015)) +
+  ggtitle("Employment by ethnicity and race: 2008-2017") +
+  labs(x = "Year", y = "Employed") +
+  scale_fill_discrete(name="Ethnicities and races") + 
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray")) +
+  scale_y_continuous(labels = scales::comma)
+
+# This is a bit difficult to group because I'm unsure which categories to choose
+employed16plus2008_17 %>% 
+  subset(occupation != "Other occupations") %>% 
+  mutate(occupation = fct_recode(occupation, Science = "Biological or life scientist", Science = "Chemist", Science = "Dietitian", Science = "Psychologist", Science = "Other natural scientist", Science = "Other social scientist or urban planner", Science = "Mathematical or computer scientist", Science = "Pharmacist", Engineer = "Engineer", Engineer ="Health technologist or technician", Engineer ="Science technician", Engineer ="Engineering and related technologist or technician", Other = "Architect", Other = "Physician", Other = "Physicians' assistant", Other = "Registered nurse", Other = "Therapist", Other = "Teacher, postsecondary (college and university)", Other = "Teacher, except postsecondary (college and university)", Other = "Other health care professional", Other = "Lawyer or judge", Other = "Other professional or related occupation" , Other = "Economist and market and survey researcher")) %>% 
+  mutate(occupation = fct_relevel(occupation, c("Science","Engineer","Management, business, and financial operations occupations","Other"))) %>% 
+  ggplot(mapping = aes(x=year, y=employed, fill = occupation)) + 
+  geom_bar(stat= "identity") +
+  #scale_x_continuous(breaks = c(2008,2010,2012,2014,2016)) +
+  ggtitle("Employment by sector: 2008–2017") +
+  labs(x = "Year", y = "Employed") +
+  scale_fill_discrete(name="Occupation", labels= c("Science", "Engineer", "Management and Financial", "Other")) + 
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray")) +
+  scale_y_continuous(labels = scales::comma)
+```
+```{r empployedWOmenMen_Science_VIS}
+#ToDo labels in order of appearance
+
+employedMen_Women2008_17 %>% 
+  #subset(occupation != "Other occupations") %>% 
+  mutate(occupation = fct_recode(occupation, Science = "Biological or life scientist", Science = "Chemist", Science = "Dietitian", Science = "Psychologist", Science = "Other natural scientist", Science = "Other social scientist or urban planner", Science = "Mathematical or computer scientist", Science = "Pharmacist", Engineer = "Engineer", Engineer ="Health technologist or technician", Engineer ="Science technician", Engineer ="Engineering and related technologist or technician", Other = "Architect", Other = "Physician", Other = "Physicians' assistant", Other = "Registered nurse", Other = "Therapist", Other = "Teacher, postsecondary (college and university)", Other = "Teacher, except postsecondary (college and university)", Other = "Other health care professional", Other = "Lawyer or judge", Other = "Other professional or related occupation" , Other = "Economist and market and survey researcher")) %>% 
+  mutate(occupation = fct_relevel(occupation, c("Science","Engineer","Management, business, and financial operations occupations","Other"))) %>% 
+  ggplot(mapping = aes(x=year, y=employed, fill = sex)) + 
+  geom_bar(stat= "identity", position = "dodge") +
+  ggtitle("Employment by gender: 2008–2017") +
+  labs(x = "Year", y = "Employed") +
+  scale_fill_discrete(name="Sex", labels= c("Female", "Male")) +
+  scale_x_continuous(breaks = c(2008,2009,2010,2011,2012,2013,2014,2015,2016,2017)) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray")) +
+  scale_y_continuous(labels = scales::comma)  
+
+#subset for computer science employed
+employedMen_Women2008_17 %>% 
+  subset(occupation == "Mathematical or computer scientist") %>% 
+  ggplot(mapping = aes(x=year, y=employed, color = sex)) + 
+  geom_line(size=1) +
+  ggtitle("Employment in computer science by gender: 2008–2017") +
+  labs(x = "Year", y = "Employed") +
+  scale_fill_discrete(name="Sex", labels= c("Female","Male" )) +
+  scale_x_continuous(breaks = c(2008,2009,2010,2011,2012,2013,2014,2015,2016,2017)) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray")) +
+  scale_y_continuous(labels = scales::comma)
+
+```
+
+```{r Employed_Women16plus_VIS}
+Employed_Women16plus %>% 
+  subset(occupation != "Other occupations") %>% 
+  mutate(occupation = fct_recode(occupation, Science = "Biological or life scientist", Science = "Chemist", Science = "Dietitian", Science = "Psychologist", Science = "Other natural scientist", Science = "Other social scientist or urban planner", Science = "Mathematical or computer scientist", Science = "Pharmacist", Engineer = "Engineer", Engineer ="Health technologist or technician", Engineer ="Science technician", Engineer ="Engineering and related technologist or technician", Other = "Architect", Other = "Physician", Other = "Physicians' assistant", Other = "Registered nurse", Other = "Therapist", Other = "Teacher, postsecondary (college and university)", Other = "Teacher, except postsecondary (college and university)", Other = "Other health care professional", Other = "Lawyer or judge", Other = "Other professional or related occupation" , Other = "Economist and market and survey researcher")) %>% 
+  mutate(occupation = fct_relevel(occupation, c("Science","Engineer","Management, business, and financial operations occupations","Other"))) %>% 
+  ggplot(mapping = aes(x=year, y=employ_women, fill = occupation)) + 
+  geom_bar(stat= "identity") +
+  scale_x_continuous(breaks = c(2008,2009,2010,2011,2012,2013,2014,2015,2016,2017)) +
+  ggtitle("Female employment by sector: 2008–2017") +
+  labs(x = "Year", y = "Employed") +
+  scale_fill_discrete(name="Occupation", labels= c("Science", "Engineering", "Management and Financial", "Other")) + 
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray")) +
+  scale_y_continuous(labels = scales::comma)
+
+Employed_Women16plus %>% 
+  mutate(occupation = fct_recode(occupation, Other = "Biological or life scientist", Other = "Chemist", Other = "Dietitian", Other = "Psychologist", Other = "Other natural scientist", Other = "Other social scientist or urban planner", Other = "Pharmacist", Other = "Engineer", Other ="Health technologist or technician", Other ="Science technician", Other ="Engineering and related technologist or technician", Other = "Architect", Other = "Physician", Other = "Physicians' assistant", Other = "Registered nurse", Other = "Therapist", Other = "Teacher, postsecondary (college and university)", Other = "Teacher, except postsecondary (college and university)", Other = "Other health care professional", Other = "Lawyer or judge", Other = "Other professional or related occupation" , Other = "Economist and market and survey researcher", Other ="Management, business, and financial operations occupations", Other = "Other occupations")) %>% 
+  ggplot(mapping = aes(x=year, y=employ_women, fill = occupation)) + 
+  geom_bar(stat= "identity") +
+  ggtitle("Level of employment for computer science: 2008–2017") +
+  labs(x = "Year", y = "Employed") +
+  scale_fill_discrete(name="Occupation", labels= c("Other","Mathematical or Computer Science" )) +
+  scale_x_continuous(breaks = c(2008,2009,2010,2011,2012,2013,2014,2015,2016,2017)) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray")) +
+  scale_y_continuous(labels = scales::comma) 
+```
+
+
+```{r EmployedMen16plus2008_17_VIS}
+
+EmployedMen16plus2008_17 %>% 
+  subset(occupation != "Other occupations") %>% 
+  mutate(occupation = fct_recode(occupation, Science = "Biological or life scientist", Science = "Chemist", Science = "Dietitian", Science = "Psychologist", Science = "Other natural scientist", Science = "Other social scientist or urban planner", Science = "Mathematical or computer scientist", Science = "Pharmacist", Engineer = "Engineer", Engineer ="Health technologist or technician", Engineer ="Science technician", Engineer ="Engineering and related technologist or technician", Other = "Architect", Other = "Physician", Other = "Physicians' assistant", Other = "Registered nurse", Other = "Therapist", Other = "Teacher, postsecondary (college and university)", Other = "Teacher, except postsecondary (college and university)", Other = "Other health care professional", Other = "Lawyer or judge", Other = "Other professional or related occupation" , Other = "Economist and market and survey researcher")) %>% 
+  mutate(occupation = fct_relevel(occupation, c("Science","Engineer","Management, business, and financial operations occupations","Other"))) %>% 
+  ggplot(mapping = aes(x=year, y=employedMen, fill = occupation)) + 
+  geom_bar(stat= "identity") +
+  ggtitle("Male employment by sector from 2008-2017") +
+  labs(x = "Year", y = "Employed") +
+  scale_fill_discrete(name="Occupation", labels= c("Science", "Engineer", "Management and Financial", "Other")) +
+  scale_x_continuous(breaks = c(2008,2009,2010,2011,2012,2013,2014,2015,2016,2017)) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray")) +
+  scale_y_continuous(labels = scales::comma) 
+
+EmployedMen16plus2008_17 %>% 
+  mutate(occupation = fct_recode(occupation, Other = "Biological or life scientist", Other = "Chemist", Other = "Dietitian", Other = "Psychologist", Other = "Other natural scientist", Other = "Other social scientist or urban planner", Other = "Pharmacist", Other = "Engineer", Other ="Health technologist or technician", Other ="Science technician", Other ="Engineering and related technologist or technician", Other = "Architect", Other = "Physician", Other = "Physicians' assistant", Other = "Registered nurse", Other = "Therapist", Other = "Teacher, postsecondary (college and university)", Other = "Teacher, except postsecondary (college and university)", Other = "Other health care professional", Other = "Lawyer or judge", Other = "Other professional or related occupation" , Other = "Economist and market and survey researcher", Other ="Management, business, and financial operations occupations", Other = "Other occupations")) %>% 
+  ggplot(mapping = aes(x=year, y=employedMen, fill = occupation)) + 
+  geom_bar(stat= "identity") +
+  ggtitle("Level of Male employment in computer science: 2008–17") +
+  labs(x = "Year", y = "Employed") +
+  scale_fill_discrete(name="Occupation", labels= c("Other","Mathematical or Computer Science" )) +
+  scale_x_continuous(breaks = c(2008,2009,2010,2011,2012,2013,2014,2015,2016,2017)) +
+  theme(panel.background = element_blank(),panel.grid.major= element_blank()) +
+  theme(axis.line.y.left = element_line(colour = "gray"), axis.line.x = element_line(colour = "gray")) +
+  scale_y_continuous(labels = scales::comma) 
+
+```
+
+## Conclusion
+Overall in these graphs I see that more and more young people are getting degrees and that as assumed generally less women are in science and engineering fields. I was surprised by exactly how big the gap is between white students and other students and also female and male students.
+It could be very interesting to cross reference this data with the percentage of the ethnicities in the general population to see whether there is less of a difference between the groups in that case.
+Overall, these visualisations are a great start to begin seeing some trends in the field of Engineering and Science but it would be great to have data per each subgroup. For example what is the percentage of females and males for different ethnic groups?
+
+Future ideas:
+I would like to still try some other visualizations like the treemapify to show the whole and the areas of each subgroup and maybe chose some different color palettes. 

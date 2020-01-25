@@ -1,0 +1,64 @@
+occupation;ethnicities;bachelor_Female;bachelor_Male;master_Female;master_Male;doctorate_Female;doctorate_Male
+Biological/life scientist;hispanic_Latino;12000;5000;5000;3000;6000;6000
+Computer and information scientist;hispanic_Latino;29000;116000;11000;23000;NA;2000
+Mathematical scientist;hispanic_Latino;NA;6000;2000;2000;1000;1000
+Physical scientist;hispanic_Latino;3000;14000;5000;2000;1000;3000
+Psychologist;hispanic_Latino;2000;NA;16000;2000;6000;NA
+Social scientist;hispanic_Latino;11000;NA;3000;3000;1000;3000
+Engineering occupations;hispanic_Latino;17000;77000;8000;34000;1000;6000
+S&E-related occupations;hispanic_Latino;256000;159000;96000;58000;15000;7000
+Non-S&E occupations;hispanic_Latino;393000;299000;212000;126000;11000;11000
+Biological/life scientist;native_american;NA;NA;NA;NA;NA;NA
+Computer and information scientist;native_american;NA;NA;NA;NA;NA;NA
+Mathematical scientist;native_american;NA;NA;NA;NA;NA;NA
+Physical scientist;native_american;NA;NA;NA;NA;NA;NA
+Psychologist;native_american;NA;NA;NA;NA;NA;NA
+Social scientist;native_american;NA;NA;NA;NA;NA;NA
+Engineering occupations;native_american;NA;NA;NA;250;NA;NA
+S&E-related occupations;native_american;15000;2000;NA;NA;NA;NA
+Non-S&E occupations;native_american;11000;14000;3000;5000;NA;NA
+Biological/life scientist;asian;14000;10000;15000;19000;24000;38000
+Computer and information scientist;asian;111000;248000;110000;275000;12000;30000
+Mathematical scientist;asian;4000;6000;11000;16000;7000;9000
+Physical scientist;asian;6000;11000;5000;8000;5000;16000
+Psychologist;asian;NA;NA;6000;250;3000;NA
+Social scientist;asian;2000;1000;8000;4000;6000;4000
+Engineering occupations;asian;19000;89000;30000;102000;5000;37000
+S&E-related occupations;asian;276000;202000;128000;142000;29000;33000
+Non-S&E occupations;asian;362000;292000;191000;205000;19000;43000
+Biological/life scientist;black_African_American;4000;NA;4000;NA;1000;4000
+Computer and information scientist;black_African_American;93000;97000;12000;20000;NA;2000
+Mathematical scientist;black_African_American;2000;NA;1000;NA;1000;2000
+Physical scientist;black_African_American;4000;2000;1000;2000;NA;2000
+Psychologist;black_African_American;2000;NA;3000;NA;4000;1000
+Social scientist;black_African_American;5000;250;15000;3000;5000;8000
+Engineering occupations;black_African_American;6000;32000;5000;17000;NA;2000
+S&E-related occupations;black_African_American;220000;131000;107000;61000;3000;3000
+Non-S&E occupations;black_African_American;327000;217000;271000;127000;15000;18000
+Biological/life scientist;native_Hawaiian_Pacific_Islander;NA;250;NA;NA;NA;NA
+Computer and information scientist;native_Hawaiian_Pacific_Islander;NA;8000;NA;NA;NA;NA
+Mathematical scientist;native_Hawaiian_Pacific_Islander;NA;NA;NA;NA;NA;NA
+Physical scientist;native_Hawaiian_Pacific_Islander;NA;NA;NA;NA;NA;NA
+Psychologist;native_Hawaiian_Pacific_Islander;NA;NA;NA;NA;NA;NA
+Social scientist;native_Hawaiian_Pacific_Islander;NA;NA;NA;NA;NA;NA
+Engineering occupations;native_Hawaiian_Pacific_Islander;NA;7000;NA;250;NA;NA
+S&E-related occupations;native_Hawaiian_Pacific_Islander;NA;5000;NA;NA;NA;NA
+Non-S&E occupations;native_Hawaiian_Pacific_Islander;9000;10000;3000;1000;NA;NA
+Biological/life scientist;white;86000;89000;49000;49000;57000;78000
+Computer and information scientist;white;267000;1087000;118000;341000;8000;38000
+Mathematical scientist;white;46000;50000;31000;43000;14000;20000
+Physical scientist;white;34000;85000;27000;46000;11000;61000
+Psychologist;white;21000;5000;52000;20000;41000;31000
+Social scientist;white;47000;35000;49000;44000;41000;41000
+Engineering occupations;white;99000;690000;60000;283000;9000;54000
+S&E-related occupations;white;1827000;1156000;1041000;582000;78000;95000
+Non-S&E occupations;white;2374000;2552000;1452000;1249000;133000;189000
+Biological/life scientist;more_races;2000;3000;1000;NA;1000;2000
+Computer and information scientist;more_races;12000;27000;1000;8000;NA;NA
+Mathematical scientist;more_races;250;NA;NA;NA;NA;NA
+Physical scientist;more_races;NA;1000;1000;NA;NA;1000
+Psychologist;more_races;NA;NA;NA;NA;NA;1000
+Social scientist;more_races;NA;NA;1000;1000;1000;NA
+Engineering occupations;more_races;7000;15000;1000;8000;NA;1000
+S&E-related occupations;more_races;56000;28000;28000;11000;2000;1000
+Non-S&E occupations;more_races;87000;67000;39000;22000;6000;2000

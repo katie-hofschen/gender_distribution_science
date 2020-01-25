@@ -1,0 +1,68 @@
+overcategory;fields;citizens_Female;citizens_Male;Temporary_Female;Temporary_Male
+Science;Agricultural sciences;338;417;280;449
+Science;Biological sciences;4181;4657;4291;6298
+Biological sciences;Anatomy;40;43;45;56
+Biological sciences;Biochemistry;323;433;351;669
+Biological sciences;Biology;499;589;391;615
+Biological sciences;Biometry and epidemiology;203;180;114;179
+Biological sciences;Biophysics;15;35;30;68
+Biological sciences;Botany and plant biology;135;211;116;186
+Biological sciences;Cell and molecular biology;464;524;544;778
+Biological sciences;Ecology;38;58;26;32
+Biological sciences;Entomology and parasitology;60;80;49;65
+Biological sciences;Genetics;344;387;329;506
+Biological sciences;Microbiology, immunology, and virology;545;481;448;665
+Biological sciences;Nutrition;80;44;77;64
+Biological sciences;Pathology;245;268;337;414
+Biological sciences;Pharmacology and toxicology;237;277;269;410
+Biological sciences;Physiology;296;324;379;495
+Biological sciences;Zoology;17;22;2;5
+Biological sciences;Biosciences nec;640;701;784;1091
+Science;Communication;30;14;16;26
+Science;Computer sciences;97;231;95;491
+Science;Earth, atmospheric, and ocean sciences;482;657;288;677
+Earth, atmospheric, and ocean sciences;Atmospheric sciences;26;67;41;120
+Earth, atmospheric, and ocean sciences;Geosciences;148;183;88;269
+Earth, atmospheric, and ocean sciences;Ocean sciences;128;128;65;108
+Earth, atmospheric, and ocean sciences;Earth, atmospheric, and ocean sciences nec;180;279;94;180
+Science;Family and consumer sciences and human sciences;66;19;11;20
+Science;Mathematics and statistics;87;344;130;444
+Mathematics and statistics;Mathematics and applied mathematics;82;313;116;376
+Mathematics and statistics;Statistics;5;31;14;68
+Science;Multidisciplinary and interdisciplinary studies;268;319;162;346
+Science;Neurobiology and neuroscience;494;509;442;626
+Science;Physical sciences;692;2086;959;3532
+Physical sciences;Astronomy and astrophysics;74;148;54;164
+Physical sciences;Chemistry;392;971;562;1817
+Physical sciences;Physics;198;850;313;1458
+Physical sciences;Physical sciences nec;28;117;30;93
+Science;Psychology;485;334;189;169
+Psychology;Clinical psychology;46;20;8;2
+Psychology;Psychology, general;276;201;122;122
+Psychology;Psychology nec;163;113;59;45
+Science;Social sciences;463;345;170;215
+Social sciences;Agricultural economics;19;15;16;14
+Social sciences;Anthropology;67;49;23;13
+Social sciences;Economics (except agricultural);14;17;17;41
+Social sciences;Geography;25;32;20;22
+Social sciences;History and philosophy of science;3;2;3;3
+Social sciences;Linguistics;9;14;10;5
+Social sciences;Political science and government;123;103;37;56
+Social sciences;Sociology;52;33;13;14
+Social sciences;Sociology and anthropology;1;2;0;0
+Social sciences;Social sciences nec;150;78;31;47
+Engineering;Aerospace engineering;12;69;8;112
+Engineering;Agricultural engineering;20;40;27;78
+Engineering;Architecture;4;4;4;4
+Engineering;Biomedical engineering;207;336;230;505
+Engineering;Chemical engineering;96;304;202;616
+Engineering;Civil engineering;90;180;86;350
+Engineering;Electrical engineering;47;267;116;756
+Engineering;Engineering science, mechanics, and physics;20;65;36;163
+Engineering;Industrial and manufacturing engineering;14;25;13;78
+Engineering;Mechanical engineering;69;288;109;614
+Engineering;Metallurgical and materials engineering;56;178;125;523
+Engineering;Mining engineering;1;3;2;4
+Engineering;Nuclear engineering;1;23;11;65
+Engineering;Petroleum engineering;1;8;8;55
+Engineering;Engineering nec;43;119;64;242
